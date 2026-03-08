@@ -48,8 +48,7 @@ public class LevelCommand implements CommandExecutor {
             IntentRouter router,
             WorldPatchExecutor world,
             PayloadExecutorV1 payloadExecutor,
-            PlayerSessionManager sessions
-    ) {
+            PlayerSessionManager sessions) {
         this.plugin = plugin;
         this.backend = backend;
         this.router = router;
@@ -158,6 +157,7 @@ public class LevelCommand implements CommandExecutor {
     @SuppressWarnings("unchecked")
     private void applyPatchFromResponse(Player player, String resp, boolean useBootstrap) {
         try {
+                
             JsonElement rootEl = JsonParser.parseString(resp);
             if (!rootEl.isJsonObject()) return;
 
@@ -169,6 +169,7 @@ public class LevelCommand implements CommandExecutor {
             } else if (root.has("world_patch") && root.get("world_patch").isJsonObject()) {
                 patchObj = root.getAsJsonObject("world_patch");
             }
+                
 
             if (patchObj == null) return;
 
@@ -179,8 +180,10 @@ public class LevelCommand implements CommandExecutor {
                 }
                 return;
             }
+            
 
-            Type type = new TypeToken<Map<String, Object>>() {}.getType();
+            Type type = new TypeToken<Map<String,
+                Object>>() {}.getType();
             Map<String, Object> patch = GSON.fromJson(patchObj, type);
             if (patch == null || patch.isEmpty()) return;
 

@@ -53,7 +53,8 @@ public class IntentDispatcher2 {
     }.getType();
     private static final String PRIMARY_LEVEL_ID = "flagship_03";
 
-    public IntentDispatcher2(Plugin plugin, BackendClient backend, WorldPatchExecutor world, PayloadExecutorV1 payloadExecutor) {
+    public IntentDispatcher2(Plugin plugin, BackendClient backend, WorldPatchExecutor world,
+            PayloadExecutorV1 payloadExecutor) {
         this.plugin = plugin;
         this.backend = backend;
         this.world = world;
@@ -144,8 +145,8 @@ public class IntentDispatcher2 {
 
         boolean createStoryUnlocked = ensureUnlocked(fp, TutorialState.CREATE_STORY, "请继续当前教学提示后再创造剧情。");
         plugin.getLogger().log(Level.INFO,
-            "[DEBUG] CREATE_STORY gate={0} player={1} rawText={2}",
-            new Object[]{createStoryUnlocked ? "UNLOCKED" : "LOCKED", fp.getName(), rawTextForLog});
+                "[DEBUG] CREATE_STORY gate={0} player={1} rawText={2}",
+                new Object[] { createStoryUnlocked ? "UNLOCKED" : "LOCKED", fp.getName(), rawTextForLog });
 
         if (!createStoryUnlocked) {
             return;
@@ -200,15 +201,15 @@ public class IntentDispatcher2 {
         }
 
         plugin.getLogger().log(Level.INFO,
-            "[DEBUG] CREATE_STORY scene_theme={0} scene_hint={1} player={2} pos=({3},{4},{5})",
-            new Object[]{
-                finalSceneTheme != null ? finalSceneTheme : "<none>",
-                finalSceneHint != null ? finalSceneHint : "<none>",
-                fp.getName(),
-                String.format(Locale.ROOT, "%.1f", playerLocation.getX()),
-                String.format(Locale.ROOT, "%.1f", playerLocation.getY()),
-                String.format(Locale.ROOT, "%.1f", playerLocation.getZ()),
-            });
+                "[DEBUG] CREATE_STORY scene_theme={0} scene_hint={1} player={2} pos=({3},{4},{5})",
+                new Object[] {
+                        finalSceneTheme != null ? finalSceneTheme : "<none>",
+                        finalSceneHint != null ? finalSceneHint : "<none>",
+                        fp.getName(),
+                        String.format(Locale.ROOT, "%.1f", playerLocation.getX()),
+                        String.format(Locale.ROOT, "%.1f", playerLocation.getY()),
+                        String.format(Locale.ROOT, "%.1f", playerLocation.getZ()),
+                });
 
         String jsonBody = GSON.toJson(body);
 
@@ -279,7 +280,8 @@ public class IntentDispatcher2 {
     // ============================================================
     // 为玩家加载关卡（应用场景和NPC）
     // ============================================================
-    private void loadLevelForPlayer(Player p, String levelId, IntentResponse2 intent, String sceneTheme, String sceneHint) {
+    private void loadLevelForPlayer(Player p, String levelId, IntentResponse2 intent, String sceneTheme,
+            String sceneHint) {
         final Player fp = p;
         final String canonicalLevel = LevelIds.canonicalizeOrDefault(
                 enforceTutorialExitRedirect(fp, levelId, intent != null ? intent.rawText : null));
@@ -344,15 +346,16 @@ public class IntentDispatcher2 {
                         if (intent != null && intent.worldPatch != null) {
                             plugin.getLogger().info("[加载关卡] 使用intent的worldPatch");
                             Map<String, Object> patch = GSON.fromJson(intent.worldPatch, MAP_TYPE);
+                                    
                             syncTutorialState(fp, patch);
                             world.execute(fp, patch);
                             fp.sendMessage("§a✨ 场景已加载！");
                             String sceneReadyMessage = buildSceneReadyMessage(normalizedSceneTheme, normalizedSceneHint);
                             if (sceneReadyMessage != null) {
                                 fp.sendMessage(sceneReadyMessage);
-                            }
+                            }  
                         } else {
-                            plugin.getLogger().log(Level.WARNING,
+                            plugin.getLogger().log(Level.WARNING, 
                                     "[CREATE_STORY] no patch applied level={0} player={1} scene_theme={2} scene_hint={3}",
                                     new Object[]{canonicalLevel, fp.getName(),
                                             normalizedSceneTheme != null ? normalizedSceneTheme : "<none>",
@@ -840,7 +843,7 @@ public class IntentDispatcher2 {
         if (rawHint == null) {
             return null;
         }
-        String hint = rawHint.trim();
+        String hint = rawHint .trim(); 
         if (hint.isEmpty()) {
             return null;
         }

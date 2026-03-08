@@ -88,7 +88,9 @@ public class DriftPlugin extends JavaPlugin {
             url = getConfig().getString("backend.baseUrl");
         }
         if (url == null || url.isBlank()) {
-            url = "http://127.0.0.1:8000";
+            getLogger().severe("[DriftPlugin] 缺少 backend_url 配置，插件已禁用。请在 config.yml 设置 backend_url");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
         }
         url = url.trim();
         if (url.endsWith("/")) {

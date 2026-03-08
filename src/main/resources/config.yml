@@ -3,7 +3,7 @@
 # =========================================
 
 # 后端服务配置（Railway 部署地址）
-backend_url: "https://your-drift-backend.up.railway.app"
+backend_url: "https://drift-backend-production-c2a5.up.railway.app"
 
 # 系统设置
 system:

@@ -3,9 +3,12 @@ package com.driftmc.backend;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.bukkit.Bukkit;
 
+import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -15,6 +18,9 @@ import okhttp3.Response;
 import okhttp3.ResponseBody;
 
 public class BackendClient {
+
+    private static final Logger LOGGER = Logger.getLogger(BackendClient.class.getName());
+    private static final int LOG_PREVIEW_LIMIT = 800;
 
     private final String baseUrl;
     private final OkHttpClient client;
@@ -58,6 +64,25 @@ public class BackendClient {
         return baseUrl + path;
     }
 
+    private static String preview(String text) {
+        if (text == null) {
+            return "";
+        }
+        String normalized = text.replace("\n", " ").replace("\r", " ");
+        if (normalized.length() <= LOG_PREVIEW_LIMIT) {
+            return normalized;
+        }
+        return normalized.substring(0, LOG_PREVIEW_LIMIT) + "...";
+    }
+
+    private static boolean isIntentRequestPath(String path) {
+        return path != null && path.startsWith("/ai/intent");
+    }
+
+    private static boolean isWorldApplyPath(String path) {
+        return path != null && path.startsWith("/world/apply");
+    }
+
     // ------------------------------------------------------
     // 同步 postJson（调试用）
     // ------------------------------------------------------
@@ -74,12 +99,24 @@ public class BackendClient {
                 .post(body)
                 .build();
 
+        if (isIntentRequestPath(path)) {
+            LOGGER.log(Level.INFO, "[BackendClient][intent request] path={0} payload={1}", new Object[] { path, preview(json) });
+        }
+
         try (Response resp = client.newCall(request).execute()) {
-            if (!resp.isSuccessful()) {
-                throw new IOException("POST " + path + " failed: " + resp.code());
-            }
             ResponseBody rb = resp.body();
-            return rb != null ? rb.string() : "";
+            String responseText = rb != null ? rb.string() : "";
+
+            if (isWorldApplyPath(path)) {
+                LOGGER.log(Level.INFO, "[BackendClient][world patch response] code={0} body={1}", new Object[] { resp.code(), preview(responseText) });
+            }
+
+            if (!resp.isSuccessful()) {
+                LOGGER.log(Level.WARNING, "[BackendClient][http error] path={0} code={1} body={2}", new Object[] { path, resp.code(), preview(responseText) });
+                throw new IOException("POST " + path + " failed: " + resp.code() + ", body=" + preview(responseText));
+            }
+
+            return responseText;
         }
     }
 
@@ -87,6 +124,10 @@ public class BackendClient {
     // 异步 postJson（用于 IntentRouter2）
     // ------------------------------------------------------
     public void postJsonAsync(String path, String json, Callback callback) {
+
+        if (isIntentRequestPath(path)) {
+            LOGGER.log(Level.INFO, "[BackendClient][intent request] path={0} payload={1}", new Object[] { path, preview(json) });
+        }
 
         RequestBody body = RequestBody.create(
             MediaType.parse("application/json; charset=utf-8"),
@@ -97,7 +138,42 @@ public class BackendClient {
                 .post(body)
                 .build();
 
-        client.newCall(request).enqueue(callback);
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                LOGGER.log(Level.WARNING, "[BackendClient][http error] path={0} error={1}", new Object[] { path, e.getMessage() });
+                if (callback != null) {
+                    callback.onFailure(call, e);
+                }
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                if (isWorldApplyPath(path)) {
+                    String peek = "";
+                    try {
+                        peek = response.peekBody(8192).string();
+                    } catch (Exception ignored) {
+                    }
+                    LOGGER.log(Level.INFO, "[BackendClient][world patch response] code={0} body={1}", new Object[] { response.code(), preview(peek) });
+                }
+
+                if (!response.isSuccessful()) {
+                    String peek = "";
+                    try {
+                        peek = response.peekBody(8192).string();
+                    } catch (Exception ignored) {
+                    }
+                    LOGGER.log(Level.WARNING, "[BackendClient][http error] path={0} code={1} body={2}", new Object[] { path, response.code(), preview(peek) });
+                }
+
+                if (callback != null) {
+                    callback.onResponse(call, response);
+                } else {
+                    response.close();
+                }
+            }
+        });
     }
 
     // ------------------------------------------------------
