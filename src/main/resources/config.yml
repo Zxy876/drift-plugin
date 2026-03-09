@@ -2,8 +2,9 @@
 # DriftSystem / 心悦宇宙 配置文件
 # =========================================
 
-# 后端服务配置（Railway 部署地址）
+# 后端服务配置
 backend_url: "https://drift-backend-production-c2a5.up.railway.app"
+timeout: 5000
 
 # 系统设置
 system:

@@ -3,12 +3,9 @@ package com.driftmc.backend;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import org.bukkit.Bukkit;
 
-import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -19,22 +16,19 @@ import okhttp3.ResponseBody;
 
 public class BackendClient {
 
-    private static final Logger LOGGER = Logger.getLogger(BackendClient.class.getName());
-    private static final int LOG_PREVIEW_LIMIT = 800;
-
     private final String baseUrl;
     private final OkHttpClient client;
 
     public BackendClient(String baseUrl) {
         this(
-            baseUrl,
-            Duration.ofSeconds(150),
-            Duration.ofSeconds(10),
-            Duration.ofSeconds(120),
-            Duration.ofSeconds(120));
-        }
+                baseUrl,
+                Duration.ofSeconds(150),
+                Duration.ofSeconds(10),
+                Duration.ofSeconds(120),
+                Duration.ofSeconds(120));
+    }
 
-        public BackendClient(
+    public BackendClient(
             String baseUrl,
             Duration callTimeout,
             Duration connectTimeout,
@@ -49,10 +43,10 @@ public class BackendClient {
 
         // ---- 最终稳定配置（适配 DriftSystem） ----
         this.client = new OkHttpClient.Builder()
-            .callTimeout(callTimeout) // 整体最大时间
-            .connectTimeout(connectTimeout) // 连接服务器超时
-            .readTimeout(readTimeout) // 读取 JSON 超时
-            .writeTimeout(writeTimeout) // 发送 JSON 超时
+                .callTimeout(callTimeout) // 整体最大时间
+                .connectTimeout(connectTimeout) // 连接服务器超时
+                .readTimeout(readTimeout) // 读取 JSON 超时
+                .writeTimeout(writeTimeout) // 发送 JSON 超时
                 .retryOnConnectionFailure(true) // 避免偶发超时
                 .followRedirects(true)
                 .build();
@@ -64,25 +58,6 @@ public class BackendClient {
         return baseUrl + path;
     }
 
-    private static String preview(String text) {
-        if (text == null) {
-            return "";
-        }
-        String normalized = text.replace("\n", " ").replace("\r", " ");
-        if (normalized.length() <= LOG_PREVIEW_LIMIT) {
-            return normalized;
-        }
-        return normalized.substring(0, LOG_PREVIEW_LIMIT) + "...";
-    }
-
-    private static boolean isIntentRequestPath(String path) {
-        return path != null && path.startsWith("/ai/intent");
-    }
-
-    private static boolean isWorldApplyPath(String path) {
-        return path != null && path.startsWith("/world/apply");
-    }
-
     // ------------------------------------------------------
     // 同步 postJson（调试用）
     // ------------------------------------------------------
@@ -91,32 +66,20 @@ public class BackendClient {
             throw new IllegalStateException("BackendClient.postJson cannot run on the primary server thread");
         }
         RequestBody body = RequestBody.create(
-            MediaType.parse("application/json; charset=utf-8"),
-            json);
+                MediaType.parse("application/json; charset=utf-8"),
+                json);
 
         Request request = new Request.Builder()
                 .url(buildUrl(path))
                 .post(body)
                 .build();
 
-        if (isIntentRequestPath(path)) {
-            LOGGER.log(Level.INFO, "[BackendClient][intent request] path={0} payload={1}", new Object[] { path, preview(json) });
-        }
-
         try (Response resp = client.newCall(request).execute()) {
-            ResponseBody rb = resp.body();
-            String responseText = rb != null ? rb.string() : "";
-
-            if (isWorldApplyPath(path)) {
-                LOGGER.log(Level.INFO, "[BackendClient][world patch response] code={0} body={1}", new Object[] { resp.code(), preview(responseText) });
-            }
-
             if (!resp.isSuccessful()) {
-                LOGGER.log(Level.WARNING, "[BackendClient][http error] path={0} code={1} body={2}", new Object[] { path, resp.code(), preview(responseText) });
-                throw new IOException("POST " + path + " failed: " + resp.code() + ", body=" + preview(responseText));
+                throw new IOException("POST " + path + " failed: " + resp.code());
             }
-
-            return responseText;
+            ResponseBody rb = resp.body();
+            return rb != null ? rb.string() : "";
         }
     }
 
@@ -125,55 +88,16 @@ public class BackendClient {
     // ------------------------------------------------------
     public void postJsonAsync(String path, String json, Callback callback) {
 
-        if (isIntentRequestPath(path)) {
-            LOGGER.log(Level.INFO, "[BackendClient][intent request] path={0} payload={1}", new Object[] { path, preview(json) });
-        }
-
         RequestBody body = RequestBody.create(
-            MediaType.parse("application/json; charset=utf-8"),
-            json);
+                MediaType.parse("application/json; charset=utf-8"),
+                json);
 
         Request request = new Request.Builder()
                 .url(buildUrl(path))
                 .post(body)
                 .build();
 
-        client.newCall(request).enqueue(new Callback() {
-            @Override
-            public void onFailure(Call call, IOException e) {
-                LOGGER.log(Level.WARNING, "[BackendClient][http error] path={0} error={1}", new Object[] { path, e.getMessage() });
-                if (callback != null) {
-                    callback.onFailure(call, e);
-                }
-            }
-
-            @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                if (isWorldApplyPath(path)) {
-                    String peek = "";
-                    try {
-                        peek = response.peekBody(8192).string();
-                    } catch (Exception ignored) {
-                    }
-                    LOGGER.log(Level.INFO, "[BackendClient][world patch response] code={0} body={1}", new Object[] { response.code(), preview(peek) });
-                }
-
-                if (!response.isSuccessful()) {
-                    String peek = "";
-                    try {
-                        peek = response.peekBody(8192).string();
-                    } catch (Exception ignored) {
-                    }
-                    LOGGER.log(Level.WARNING, "[BackendClient][http error] path={0} code={1} body={2}", new Object[] { path, response.code(), preview(peek) });
-                }
-
-                if (callback != null) {
-                    callback.onResponse(call, response);
-                } else {
-                    response.close();
-                }
-            }
-        });
+        client.newCall(request).enqueue(callback);
     }
 
     // ------------------------------------------------------
@@ -204,5 +128,9 @@ public class BackendClient {
         Request request = builder.build();
 
         client.newCall(request).enqueue(callback);
+    }
+
+    public String getBaseUrl() {
+        return baseUrl;
     }
 }
