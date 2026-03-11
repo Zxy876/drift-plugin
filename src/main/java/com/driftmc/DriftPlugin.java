@@ -185,9 +185,9 @@ public class DriftPlugin extends JavaPlugin {
         // 注册 NPC 生命周期监听
         Bukkit.getPluginManager().registerEvents(npcManager, this);
 
-        // 注册 NPC 临近监听（触发老版 IntentRouter）
+        // 注册 NPC 临近监听（NPC对话走 IntentRouter2，事件仍走 RuleEventBridge）
         Bukkit.getPluginManager().registerEvents(
-                new NearbyNPCListener(this, npcManager, intentRouter, ruleEventBridge, sessionManager), this);
+            new NearbyNPCListener(this, npcManager, intentRouter2, intentDispatcher2, ruleEventBridge, sessionManager), this);
 
         // 注册教学安全守护（教程模式专用）
         Bukkit.getPluginManager().registerEvents(new TutorialSafetyListener(this, worldPatcher.getSceneLoader()), this);

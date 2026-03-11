@@ -125,6 +125,10 @@ public class IntentDispatcher2 {
                 createStory(p, intent);
                 break;
 
+            case CREATE_POETRY_SCENE:
+                createPoetryScene(p, intent);
+                break;
+
             case SAY_ONLY:
             case STORY_CONTINUE:
             case UNKNOWN:
@@ -369,6 +373,97 @@ public class IntentDispatcher2 {
                         questLogHud.showQuestLog(fp, QuestLogHud.Trigger.LEVEL_ENTER);
                     }
                 });
+            }
+        });
+    }
+
+    // ============================================================
+    // 诗歌场景创建 (CREATE_POETRY_SCENE)
+    // ============================================================
+    private void createPoetryScene(Player p, IntentResponse2 intent) {
+        final Player fp = p;
+        String poem = intent.rawText != null ? intent.rawText.trim() : "";
+
+        if (poem.isEmpty()) {
+            fp.sendMessage("§c[Poetry] 诗歌内容不能为空。请重试。");
+            return;
+        }
+
+        final String sceneTheme = normalizeSceneTheme(intent.sceneTheme);
+        final String sceneHint = normalizeSceneHint(intent.sceneHint);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("player_id", fp.getName());
+        body.put("poem", poem);
+        body.put("anchor", "player");
+
+        Location playerLocation = fp.getLocation();
+        Map<String, Object> playerPosition = new HashMap<>();
+        playerPosition.put("world", playerLocation.getWorld() != null ? playerLocation.getWorld().getName() : "world");
+        playerPosition.put("x", playerLocation.getX());
+        playerPosition.put("y", playerLocation.getY());
+        playerPosition.put("z", playerLocation.getZ());
+        body.put("player_position", playerPosition);
+
+        if (sceneTheme != null) {
+            body.put("scene_theme", sceneTheme);
+        }
+        if (sceneHint != null) {
+            body.put("scene_hint", sceneHint);
+        }
+
+        fp.sendMessage("§e📝 正在把诗歌转成场景...");
+        backend.postJsonAsync("/poetry/generate", GSON.toJson(body), new Callback() {
+
+            @Override
+            public void onFailure(Call call, IOException e) {
+                Bukkit.getScheduler().runTask(plugin,
+                        () -> fp.sendMessage("§c[Poetry] 请求失败: " + e.getMessage()));
+            }
+
+            @Override
+            public void onResponse(Call call, Response resp) throws IOException {
+                try (resp) {
+                    String respStr = resp.body() != null ? resp.body().string() : "{}";
+                    final int statusCode = resp.code();
+                    final boolean success = resp.isSuccessful();
+                    final JsonObject root = parseJsonObjectSafely(respStr);
+
+                    final JsonObject patchObj = (root.has("world_patch") && root.get("world_patch").isJsonObject())
+                            ? root.getAsJsonObject("world_patch")
+                            : null;
+
+                    final String responseSceneTheme = (root.has("scene_theme") && root.get("scene_theme").isJsonPrimitive())
+                            ? root.get("scene_theme").getAsString()
+                            : sceneTheme;
+
+                    Bukkit.getScheduler().runTask(plugin, () -> {
+                        if (!success) {
+                            fp.sendMessage("§c[Poetry] 生成失败: " + formatHttpError(statusCode, root, respStr));
+                            return;
+                        }
+
+                        if (patchObj == null || patchObj.size() == 0) {
+                            fp.sendMessage("§c[Poetry] 生成完成，但 world_patch 为空。请重试。");
+                            return;
+                        }
+
+                        Map<String, Object> patch = GSON.fromJson(patchObj, MAP_TYPE);
+                        if (patch == null || patch.isEmpty()) {
+                            fp.sendMessage("§c[Poetry] world_patch 解析失败。请重试。");
+                            return;
+                        }
+
+                        syncTutorialState(fp, patch);
+                        world.execute(fp, patch);
+
+                        fp.sendMessage("§a✨ 诗歌场景已生成。");
+                        String sceneReadyMessage = buildSceneReadyMessage(responseSceneTheme, sceneHint);
+                        if (sceneReadyMessage != null) {
+                            fp.sendMessage(sceneReadyMessage);
+                        }
+                    });
+                }
             }
         });
     }
